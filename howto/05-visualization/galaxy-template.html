@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>NETWORK // INTERNAL — INFRASTRUCTURE TOPOLOGY</title>
+<style>
+  :root {
+    --bg: #04060c;
+    --panel: rgba(10, 16, 28, 0.82);
+    --line: rgba(0, 255, 170, 0.18);
+    --accent: #00ffaa;
+    --accent2: #00d0ff;
+    --warn: #ffb020;
+    --text: #c8d6e0;
+    --dim: #5b6b78;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: var(--bg); color: var(--text);
+    font-family: "JetBrains Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+    overflow: hidden; }
+  #graph { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  .hud { position: fixed; top: 18px; left: 18px; z-index: 10; pointer-events: none; }
+  .hud .title { font-size: 15px; font-weight: 700; letter-spacing: 2px; color: #eaf4ee; }
+  .hud .sub { font-size: 10px; letter-spacing: 3px; color: var(--dim); margin-top: 4px; text-transform: uppercase; }
+  .hud .badge { display: inline-block; margin-top: 10px; padding: 3px 8px; font-size: 9px;
+    letter-spacing: 2px; border: 1px solid var(--warn); color: var(--warn); border-radius: 2px; }
+
+  .stats { position: fixed; top: 18px; right: 18px; z-index: 10; text-align: right; pointer-events: none; }
+  .stats .num { font-size: 26px; font-weight: 700; color: var(--accent); }
+  .stats .lbl { font-size: 9px; letter-spacing: 2px; color: var(--dim); text-transform: uppercase; }
+  .stats .row { margin-top: 10px; }
+
+  .legend { position: fixed; bottom: 18px; left: 18px; z-index: 10; width: 280px; max-height: 34vh;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column;
+    backdrop-filter: blur(8px); }
+  .legend .head { padding: 9px 14px; font-size: 10px; letter-spacing: 2px; color: var(--accent);
+    border-bottom: 1px solid var(--line); text-transform: uppercase; }
+  .legend .rows { overflow-y: auto; padding: 6px; }
+  .legend .rows::-webkit-scrollbar { width: 4px; }
+  .legend .rows::-webkit-scrollbar-thumb { background: var(--line); }
+  .row-item { display: flex; align-items: center; gap: 8px; padding: 3px 8px; font-size: 10.5px; }
+  .row-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .row-item .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-item .cnt { color: var(--dim); }
+
+  .tooltip { position: fixed; z-index: 40; background: rgba(6, 12, 20, 0.95); border: 1px solid var(--line);
+    padding: 8px 12px; border-radius: 4px; font-size: 11px; pointer-events: none; display: none; max-width: 320px; }
+  .tooltip .t { color: #eaf4ee; font-weight: 600; }
+  .tooltip .a { color: var(--accent2); margin-top: 3px; font-size: 10px; letter-spacing: 1px; }
+  .tooltip .c { color: var(--dim); margin-top: 3px; font-size: 10px; }
+
+  .panel-detail { position: fixed; top: 70px; right: 18px; bottom: 60px; width: 360px; z-index: 25;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    backdrop-filter: blur(8px); display: none; flex-direction: column; }
+  .panel-detail.open { display: flex; }
+  .panel-detail .p-head { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .panel-detail .p-title { font-size: 12px; font-weight: 700; color: #eaf4ee; letter-spacing: 0.5px; word-break: break-word; }
+  .panel-detail .p-type { font-size: 9px; letter-spacing: 2px; color: var(--accent2); margin-top: 4px; text-transform: uppercase; }
+  .panel-detail .p-close { position: absolute; top: 10px; right: 12px; background: none; border: 1px solid var(--line);
+    color: var(--dim); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1; }
+  .panel-detail .p-close:hover { color: var(--accent); border-color: var(--accent); }
+  .panel-detail .p-body { overflow-y: auto; padding: 12px 14px; font-size: 11px; }
+  .panel-detail .p-body::-webkit-scrollbar { width: 4px; }
+  .panel-detail .p-body::-webkit-scrollbar-thumb { background: var(--line); }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid rgba(0,255,170,0.06); }
+  .kv .k { color: var(--dim); letter-spacing: 1px; text-transform: uppercase; font-size: 9px; padding-top: 2px; flex-shrink: 0; }
+  .kv .v { color: var(--text); text-align: right; word-break: break-word; }
+  .p-sec { margin-top: 14px; font-size: 9px; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; }
+  .p-note { margin-top: 10px; font-size: 10px; color: var(--dim); line-height: 1.5; }
+  .p-list { margin-top: 6px; max-height: 200px; overflow-y: auto; border: 1px solid var(--line); border-radius: 4px; padding: 4px; }
+  .p-list::-webkit-scrollbar { width: 4px; }
+  .p-list::-webkit-scrollbar-thumb { background: var(--line); }
+  .p-item { padding: 4px 6px; font-size: 10px; border-bottom: 1px solid rgba(0,255,170,0.05); cursor: pointer; word-break: break-all; }
+  .p-item:hover { background: rgba(0,255,170,0.06); }
+  .p-item .coords { color: var(--dim); font-size: 9.5px; margin-top: 1px; }
+
+  .attrib { position: fixed; bottom: 14px; right: 18px; z-index: 5; font-size: 9px; color: var(--dim);
+    letter-spacing: 0.5px; text-align: right; pointer-events: none; max-width: 40vw; line-height: 1.5; }
+
+  .brand { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 15;
+    font-size: 9px; letter-spacing: 2px; color: var(--dim); text-align: center; pointer-events: none;
+    background: rgba(4,6,12,0.72); padding: 4px 14px; border: 1px solid rgba(0,255,170,0.15); border-radius: 4px;
+    white-space: nowrap; }
+  .brand b { color: var(--accent); font-weight: 700; }
+
+  @media (max-width: 768px) {
+    .hud { top: 54px; left: 10px; max-width: 55vw; }
+    .hud .title { font-size: 12px; letter-spacing: 1.5px; }
+    .hud .sub { font-size: 8px; letter-spacing: 2px; margin-top: 3px; }
+    .hud .badge { font-size: 7.5px; margin-top: 6px; padding: 2px 6px; letter-spacing: 1.5px; }
+    .stats { top: 54px; right: 10px; }
+    .stats .num { font-size: 18px; }
+    .stats .lbl { font-size: 7.5px; letter-spacing: 1.5px; }
+    .stats .row { margin-top: 6px; }
+    .panel-detail { top: auto; bottom: 0; left: 0; right: 0; width: 100%; max-height: 58vh;
+      border-radius: 12px 12px 0 0; border-left: none; border-right: none; border-bottom: none; }
+    .legend { left: 10px; right: 10px; width: auto; bottom: 10px; max-height: 30vh; }
+    .brand { bottom: 6px; font-size: 7.5px; letter-spacing: 1.5px; padding: 3px 10px; }
+    .attrib { font-size: 7.5px; letter-spacing: 1px; max-width: 62vw; }
+    .tooltip { font-size: 9px; max-width: 70vw; }
+  }
+</style>
+</head>
+<body>
+
+<div id="graph"></div>
+
+<div class="hud">
+  <div class="title">INTERNAL NETWORK // TOPOLOGY</div>
+  <div class="sub">Infrastructure — passive OSINT (DNS + CT + frontend)</div>
+  <div class="badge">PASSIVE OSINT · CREDS REDACTED</div>
+</div>
+
+<div class="stats">
+  <div class="row"><div class="num" id="statZones">0</div><div class="lbl">Zones</div></div>
+  <div class="row"><div class="num" id="statSvc">0</div><div class="lbl">Services</div></div>
+  <div class="row"><div class="num" id="statLinks">0</div><div class="lbl">Links</div></div>
+</div>
+
+<div class="legend">
+  <div class="head">Zones — by service count</div>
+  <div class="rows" id="zoneList"></div>
+</div>
+
+<div class="attrib">Recon data: certificate transparency, DNS resolution, frontend bundle analysis, benign HTTP probes. Visualization for research only.</div>
+
+<div class="tooltip" id="tip"></div>
+
+<div class="panel-detail" id="detail">
+  <button class="p-close" id="detailClose">×</button>
+  <div class="p-head">
+    <div class="p-title" id="detailTitle"></div>
+    <div class="p-type" id="detailType"></div>
+  </div>
+  <div class="p-body" id="detailBody"></div>
+</div>
+
+<script src="https://unpkg.com/three@0.150.0/build/three.min.js"></script>
+<script src="https://unpkg.com/3d-force-graph@1.73.0/dist/3d-force-graph.min.js"></script>
+<script src="data.js"></script>
+<script>
+(() => {
+  // ============ DATA ============
+  // Your data object: NET_INT = { zones, services, ipPools, links }
+  // See data-schema.md. Everything below is the renderer — no edits needed.
+  const { zones, services, ipPools, links } = NET_INT;
+  const zoneById = Object.fromEntries(zones.map(z => [z.id, z]));
+  const zoneColor = Object.fromEntries(zones.map(z => [z.id, z.color]));
+  const svcById = Object.fromEntries(services.map(s => [s.id, s]));
+
+  const zoneCounts = {};
+  services.forEach(s => zoneCounts[s.zone] = (zoneCounts[s.zone] || 0) + 1);
+
+  const nodes = [];
+  zones.forEach(z => nodes.push({ id: z.id, type: 'zone', name: z.name, zone: z.id, color: z.color, note: z.note, count: zoneCounts[z.id] || 0 }));
+  services.forEach(s => nodes.push({ id: s.id, type: 'service', name: s.name, zone: s.zone, color: zoneColor[s.zone], ...s }));
+  ipPools.forEach(p => nodes.push({ id: p.id, type: 'pool', name: p.name, zone: 'z-int', color: zoneColor[p.zone] || '#94a3b8', ...p }));
+
+  const graphLinks = links.map(([s, t]) => ({ source: s, target: t }));
+
+  document.getElementById('statZones').textContent = zones.length;
+  document.getElementById('statSvc').textContent = services.length + ipPools.length;
+  document.getElementById('statLinks').textContent = graphLinks.length;
+
+  const listEl = document.getElementById('zoneList');
+  zones.slice().sort((a, b) => (zoneCounts[b.id] || 0) - (zoneCounts[a.id] || 0)).forEach(z => {
+    const el = document.createElement('div');
+    el.className = 'row-item';
+    el.innerHTML = `<span class="dot" style="background:${z.color}"></span>
+      <span class="name">${z.name}</span><span class="cnt">${zoneCounts[z.id] || 0}</span>`;
+    listEl.appendChild(el);
+  });
+
+  const makeSprite = (text, color, size) => {
+    const canvas = document.createElement('canvas');
+    let ctx = canvas.getContext('2d');
+    canvas.width = 1024; canvas.height = 128;
+    ctx.font = 'bold 52px monospace';
+    ctx.textBaseline = 'middle';
+    const w = ctx.measureText(text).width + 60;
+    canvas.width = Math.max(128, w); canvas.height = 80;
+    ctx = canvas.getContext('2d');
+    ctx.font = 'bold 48px monospace';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.lineWidth = 8;
+    ctx.strokeText(text, 30, 40);
+    ctx.fillText(text, 30, 40);
+    const tex = new THREE.CanvasTexture(canvas);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+    sp.scale.set(size, size * 0.12, 1);
+    return sp;
+  };
+
+  const Graph = ForceGraph3D()(document.getElementById('graph'))
+    .graphData({ nodes, links: graphLinks })
+    .nodeThreeObject(node => {
+      if (node.type === 'zone') {
+        const group = new THREE.Group();
+        const r = 7 + Math.sqrt(node.count || 1) * 1.2;
+        const sphere = new THREE.Mesh(
+          new THREE.SphereGeometry(r, 24, 24),
+          new THREE.MeshStandardMaterial({ color: node.color, emissive: node.color, emissiveIntensity: 0.45, metalness: 0.4, roughness: 0.3 })
+        );
+        group.add(sphere);
+        const lbl = makeSprite(node.name, '#eaf4ee', r * 3.4);
+        lbl.position.y = r + 7;
+        group.add(lbl);
+        return group;
+      }
+      const r = node.type === 'pool' ? 2.2 : 1.7;
+      return new THREE.Mesh(
+        new THREE.SphereGeometry(r, 10, 10),
+        new THREE.MeshStandardMaterial({ color: node.color, emissive: node.color, emissiveIntensity: 0.6 })
+      );
+    })
+    .nodeVal(node => node.type === 'zone' ? 10 + Math.sqrt(node.count || 1) * 1.6 : 2)
+    .linkColor(() => 'rgba(0, 255, 170, 0.13)')
+    .linkWidth(0.5)
+    .linkDirectionalParticles(1)
+    .linkDirectionalParticleWidth(1.6)
+    .linkDirectionalParticleSpeed(0.005)
+    .linkDirectionalParticleColor(() => 'rgba(0, 255, 170, 0.9)')
+    .warmupTicks(150)
+    .cooldownTicks(350)
+    .backgroundColor('rgba(0,0,0,0)');
+
+  Graph.scene().add(new THREE.AmbientLight(0xffffff, 0.55));
+  Graph.scene().add(new THREE.DirectionalLight(0xffffff, 0.9));
+  Graph.scene().add(new THREE.PointLight(0x00ffaa, 0.4, 0, 0));
+
+  Graph.cameraPosition({ x: 0, y: 100, z: 340 }, { x: 0, y: 0, z: 0 }, 0);
+  Graph.controls().autoRotate = true;
+  Graph.controls().autoRotateSpeed = 0.6;
+
+  const tip = document.getElementById('tip');
+  Graph.onNodeHover(node => {
+    if (node) {
+      tip.style.display = 'block';
+      if (node.type === 'zone') tip.innerHTML = `<div class="t">${node.name}</div><div class="a">ZONE HUB</div><div class="c">${node.count} services</div>`;
+      else tip.innerHTML = `<div class="t">${node.name}</div><div class="a">${node.role || node.type.toUpperCase()}</div><div class="c">${zoneById[node.zone] ? zoneById[node.zone].name : ''}</div>`;
+    } else tip.style.display = 'none';
+  });
+
+  const detailEl = document.getElementById('detail');
+  const detailTitle = document.getElementById('detailTitle');
+  const detailType = document.getElementById('detailType');
+  const detailBody = document.getElementById('detailBody');
+
+  const esc = s => String(s ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const kv = (k, v) => v !== undefined && v !== null && v !== '' ? `<div class="kv"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>` : '';
+  const listBlock = (title, arr) => arr && arr.length ? `<div class="p-sec">${title}</div><div class="p-list">${arr.map(x => `<div class="p-item">${esc(x)}</div>`).join('')}</div>` : '';
+
+  const openDetail = node => {
+    detailTitle.textContent = node.name;
+    detailBody.innerHTML = '';
+    if (node.type === 'zone') {
+      detailType.textContent = 'Zone hub';
+      const members = services.filter(s => s.zone === node.id);
+      detailBody.innerHTML = kv('Services', members.length) + kv('Note', node.note) +
+        `<div class="p-sec">Services in zone</div><div class="p-list">${members.map(s => `<div class="p-item" data-id="${s.id}">${s.name}<div class="coords">${s.role || ''}</div></div>`).join('')}</div>`;
+      detailBody.querySelectorAll('.p-item').forEach(el => {
+        el.onclick = () => openDetail(nodes.find(n => n.id === el.dataset.id));
+      });
+    } else {
+      detailType.textContent = node.type === 'pool' ? 'IP pool' : 'Service node';
+      const zoneName = zoneById[node.zone] ? zoneById[node.zone].name : '';
+      detailBody.innerHTML =
+        kv('Role', node.role) +
+        kv('Zone', zoneName) +
+        (node.dns ? `<div class="p-sec">DNS</div><div class="p-list">${node.dns.map(d => `<div class="p-item">${esc(d)}</div>`).join('')}</div>` : '') +
+        (node.ips ? `<div class="p-sec">Addresses</div><div class="p-list">${node.ips.map(d => `<div class="p-item">${esc(d)}</div>`).join('')}</div>` : '') +
+        listBlock('Certificates', node.cert ? [node.cert] : null) +
+        listBlock('Keys / tokens', node.keys) +
+        listBlock('API endpoints', node.endpoints) +
+        kv('Note', node.note) +
+        `<div class="p-sec">Leads into</div><div class="p-note">Part of zone → <b style="color:var(--accent2)">${zoneName}</b>.</div>`;
+    }
+    detailEl.classList.add('open');
+  };
+  document.getElementById('detailClose').onclick = () => detailEl.classList.remove('open');
+
+  Graph.onNodeClick(node => {
+    Graph.cameraPosition({ x: node.x * 1.5, y: node.y * 1.5 + 70, z: node.z * 1.5 }, node, 900);
+    openDetail(node);
+  });
+
+  const qp = new URLSearchParams(location.search);
+  const foc = qp.get('focus');
+  if (foc) {
+    setTimeout(() => {
+      const n = nodes.find(x => x.id === foc);
+      if (n) { Graph.cameraPosition({ x: n.x * 1.5, y: n.y * 1.5 + 70, z: n.z * 1.5 }, n, 800); openDetail(n); }
+    }, 3000);
+  }
+  window.addEventListener('resize', () => {
+    Graph.width(window.innerWidth).height(window.innerHeight);
+  });
+})();
+</script>
+
+<div class="brand">BROUGHT TO YOU BY // <b>CHURCH OF MALWARE</b></div>
+</body>
+</html>
