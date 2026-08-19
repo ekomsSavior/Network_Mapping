@@ -1,0 +1,28 @@
+# Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+This repository — documentation, methodology, and scripts — is licensed under the
+**Creative Commons Attribution 4.0 International** license.
+
+You are free to **share** and **adapt** the material for any purpose, provided you give
+appropriate credit, provide a link to the license, and indicate if changes were made.
+
+**Attribution:** Church of Malware — *"Net_Mapping — Passive Network Mapping Methodology"* —
+https://github.com/saviorSEC/Net_Mapping
+
+---
+
+- **License text:** https://creativecommons.org/licenses/by/4.0/legalcode
+- **Summary:** https://creativecommons.org/licenses/by/4.0/
+- **SPDX identifier:** `CC-BY-4.0`
+
+---
+
+## Notes on scope
+
+- Methodology, documentation, and scripts: CC BY 4.0, as above.
+- The scripts are provided for **authorized security research** — passive analysis of
+  public artifacts only. Use them only against systems you own or are authorized to test.
+- **No warranty.** This material is provided "as is" for authorized security research
+  and responsible disclosure.
+- External libraries referenced (three.js, 3d-force-graph, globe.gl) remain under their
+  respective licenses.
